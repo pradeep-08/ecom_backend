@@ -2,27 +2,28 @@
 FROM gradle:8.5-jdk17 AS build
 WORKDIR /app
 
-# Copy everything first (simple + prevents losing exec bit later)
+# Copy everything first
 COPY . .
 
-# Ensure gradlew is unix-y and executable (covers Windows checkouts)
+# Ensure gradlew is Linux-compatible & executable
 RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
-# (Optional) warm up dependencies; don't fail if nothing to resolve
+# Optional: pull dependencies early (won't fail build)
 RUN ./gradlew dependencies --no-daemon || true
 
-# Build the JAR (skip tests for speed)
+# Build the JAR
 RUN ./gradlew clean build -x test --no-daemon
 
+
 # ---------- Stage 2: Runtime ----------
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 
-# Copy the built artifact(s) from the build stage
+# Copy built JAR
 COPY --from=build /app/build/libs/*.jar /app/app.jar
 
-# Expose Spring Boot default port
+# Expose Spring Boot port
 EXPOSE 8080
 
-# Run the application
+# Start the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
